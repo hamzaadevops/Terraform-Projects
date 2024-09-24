@@ -37,7 +37,7 @@ resource "null_resource" "configure_ntp_server" {
       type        = "ssh"
       user        = "ubuntu" # Change if needed
       private_key = file("~/.ssh/test.pem") # Path to your private key
-      host        = aws_instance.ntp_server.public_ip # Use private IP for connection
+      host        = aws_instance.ntp_server.public_ip # Use Public IP for connection
     }
   }
 }
@@ -60,7 +60,7 @@ resource "null_resource" "configure_ntp_client" {
       type        = "ssh"
       user        = "ubuntu" # Change if needed
       private_key = file("~/.ssh/test.pem") # Path to your private key
-      host        = aws_instance.ntp_client.public_ip # Use private IP for connection
+      host        = aws_instance.ntp_client.public_ip # Use Public IP for connection
     }
   }
 }
