@@ -1,4 +1,4 @@
-resource "aws_instance" "ntp_server" {
+resource "aws_instance" "master_salt" {
   ami           = var.ami_id
   instance_type = "t2.micro"
   key_name      = var.key_name
@@ -10,7 +10,7 @@ resource "aws_instance" "ntp_server" {
   }
 }
 
-resource "aws_instance" "ntp_client" {
+resource "aws_instance" "minion_salt" {
   ami           = var.ami_id
   instance_type = "t2.micro"
   key_name      = var.key_name
@@ -22,45 +22,46 @@ resource "aws_instance" "ntp_client" {
   }
 }
 
-resource "null_resource" "configure_ntp_server" {
-  depends_on = [aws_instance.ntp_server]
+resource "null_resource" "configure_master_salt" {
+  depends_on = [aws_instance.master_salt]
 
   provisioner "remote-exec" {
     inline = [
+      "sudo curl -fsSL -o /etc/apt/keyrings/salt-archive-keyring-2023.gpg https://repo.saltproject.io/salt/py3/ubuntu/22.04/amd64/SALT-PROJECT-GPG-PUBKEY-2023.gpg",
+      "echo "deb [signed-by=/etc/apt/keyrings/salt-archive-keyring-2023.gpg arch=amd64] https://repo.saltproject.io/salt/py3/ubuntu/22.04/amd64/latest jammy main" | sudo tee /etc/apt/sources.list.d/salt.list",
       "sudo apt update",
-      "sudo apt install ntp ntpstat sntp -y",
-      "echo 'restrict ${aws_instance.ntp_client.private_ip} nomodify notrap noquery' | sudo tee -a /etc/ntpsec/ntp.conf",
-      "sudo systemctl restart ntp"
+      "sudo apt install salt-master -y",
+      " ",
+      " "
     ]
 
     connection {
       type        = "ssh"
       user        = "ubuntu" # Change if needed
       private_key = file("~/.ssh/test.pem") # Path to your private key
-      host        = aws_instance.ntp_server.public_ip # Use private IP for connection
+      host        = aws_instance.master_salt.public_ip # Use private IP for connection
     }
   }
 }
 
-resource "null_resource" "configure_ntp_client" {
-  depends_on = [aws_instance.ntp_client, null_resource.configure_ntp_server]
+resource "null_resource" "configure_minion_salt" {
+  depends_on = [aws_instance.minion_salt, null_resource.configure_master_salt]
 
   provisioner "remote-exec" {
     inline = [
+      "sudo curl -fsSL -o /etc/apt/keyrings/salt-archive-keyring-2023.gpg https://repo.saltproject.io/salt/py3/ubuntu/22.04/amd64/SALT-PROJECT-GPG-PUBKEY-2023.gpg",
+      "echo "deb [signed-by=/etc/apt/keyrings/salt-archive-keyring-2023.gpg arch=amd64] https://repo.saltproject.io/salt/py3/ubuntu/22.04/amd64/latest jammy main" | sudo tee /etc/apt/sources.list.d/salt.list",
       "sudo apt update",
-      "sudo apt install ntp ntpstat sntp ntpdate -y",
-      "sleep 30", # Wait for server to be fully up and running
-      "ntpdate -q ${aws_instance.ntp_server.private_ip}",
-      "ntpdate -u ${aws_instance.ntp_server.private_ip}",
-      "echo 'server ${aws_instance.ntp_server.private_ip} prefer iburst' | sudo tee -a /etc/ntpsec/ntp.conf",
-      "sudo systemctl restart ntp"
+      "sudo apt install salt-minion -y",
+      " ",
+      " "
     ]
 
     connection {
       type        = "ssh"
       user        = "ubuntu" # Change if needed
       private_key = file("~/.ssh/test.pem") # Path to your private key
-      host        = aws_instance.ntp_client.public_ip # Use private IP for connection
+      host        = aws_instance.minion_salt.public_ip # Use private IP for connection
     }
   }
 }
